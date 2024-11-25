@@ -2,6 +2,8 @@ from pico2d import *
 
 import random
 import math
+
+from boy import Boy
 import game_framework
 import game_world
 from behavior_tree import BehaviorTree, Action, Sequence, Condition, Selector
@@ -94,6 +96,19 @@ class Zombie:
         self.y += distance * math.sin(self.dir)
         pass
 
+    def distance_over_than(self, x1, y1, x2, y2, r):
+        distance2 = (x1 - x2) ** 2 + (y1 - y2) ** 2
+        return distance2 > (PIXEL_PER_METER * r) ** 2
+        pass
+
+    def away_slightly_to(self, tx, ty):
+        # 이동하기 위해서 속도와 시간이 필요
+        self.dir = math.atan2(ty - self.y, tx - self.x)
+        distance = RUN_SPEED_PPS * game_framework.frame_time
+        self.x -= distance * math.cos(self.dir)
+        self.y -= distance * math.sin(self.dir)
+        pass
+
     def move_to(self, r=0.5):
         self.state = 'Walk'
         self.move_slightly_to(self.tx, self.ty)
@@ -120,7 +135,20 @@ class Zombie:
         self.move_slightly_to(play_mode.boy.x, play_mode.boy.y)
         if self.distance_less_than(play_mode.boy.x, play_mode.boy.y, self.x, self.y, r):
             return BehaviorTree.SUCCESS
-        else:
+        if self.compare_lose:
+            return BehaviorTree.FAIL
+        elif not self.distance_less_than(play_mode.boy.x, play_mode.boy.y, self.x, self.y, r):
+            return BehaviorTree.RUNNING
+        pass
+
+    def away_to_boy(self, r=0.5):
+        self.state = 'Walk'
+        self.away_slightly_to(play_mode.boy.x, play_mode.boy.y)
+        if self.distance_over_than(play_mode.boy.x, play_mode.boy.y, self.x, self.y, r):
+            return BehaviorTree.SUCCESS
+        if self.compare_win:
+            return BehaviorTree.FAIL
+        elif not self.distance_over_than(play_mode.boy.x, play_mode.boy.y, self.x, self.y, r):
             return BehaviorTree.RUNNING
         pass
 
@@ -129,6 +157,30 @@ class Zombie:
         self.loc_no = (self.loc_no + 1) % len(self.patrol_location)
         return BehaviorTree.SUCCESS
         pass
+
+    def compare_ball_win(self):
+        if self.ball_count >= Boy.ball_count:
+            return BehaviorTree.SUCCESS
+        else:
+            return BehaviorTree.FAIL
+
+    def compare_ball_lose(self):
+        if self.ball_count < Boy.ball_count:
+            return BehaviorTree.SUCCESS
+        else:
+            return BehaviorTree.FAIL
+
+    def compare_win(self):
+        if self.ball_count >= Boy.ball_count:
+            return True
+        else:
+            return False
+
+    def compare_lose(self):
+        if self.ball_count < Boy.ball_count:
+            return True
+        else:
+            return False
 
     def build_behavior_tree(self):
         a1 = Action('Set target location', self.set_target_location, 1000, 1000)
@@ -142,6 +194,7 @@ class Zombie:
 
         c1 = Condition('소년이 근처에 있는가?', self.is_boy_nearby, 7)
         a4 = Action('소년 한테 접근', self.move_to_boy)
+        a6 = Action('소년 한테 도망', self.away_to_boy)
 
         root = chase_boy = Sequence('Chase boy', c1, a4)
 
@@ -151,6 +204,16 @@ class Zombie:
         root = patrol = Sequence('Patrol', a5, a2)
 
         root = chase_or_patrol = Selector('추적 또는 순찰', chase_boy, patrol)
+
+        b1 = Action('좀비 공 우세', self.compare_ball_win)
+        zombiewin = Sequence('좀비 승리', c1, b1, a4)
+
+        b2 = Action('좀비 공 열세', self.compare_ball_lose)
+        zombielose = Sequence('좀비 패배', c1, b2, a6)
+
+        root = fight = Selector('좀비 경합', zombiewin, zombielose)
+
+        root = Selector('경합 또는 순찰', fight, patrol)
 
         self.bt = BehaviorTree(root)
         pass

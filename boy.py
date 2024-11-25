@@ -248,6 +248,8 @@ class RunDown:
 
 
 class Boy:
+    ball_count = 0
+
     def __init__(self):
         self.x, self.y = 1280 // 2, 1024 // 2
         self.frame = 0
@@ -256,7 +258,6 @@ class Boy:
         self.font = load_font('ENCR10B.TTF', 40)
         self.state_machine = StateMachine(self)
         self.state_machine.start(Idle)
-        self.ball_count = 0
         self.state_machine.set_transitions(
             {
                 Idle: {right_down: RunRight, left_down: RunLeft, left_up: RunRight, right_up: RunLeft, upkey_down: RunUp, downkey_down: RunDown, upkey_up: RunDown, downkey_up: RunUp},
@@ -287,7 +288,7 @@ class Boy:
 
     def handle_collision(self, group, other):
         if group == 'boy:ball':
-            self.ball_count += 1
+            Boy.ball_count += 1
 
 
 
