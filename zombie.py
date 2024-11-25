@@ -150,5 +150,7 @@ class Zombie:
         a5 = Action('순찰 위치 가져오기', self.get_patrol_location)
         root = patrol = Sequence('Patrol', a5, a2)
 
+        root = chase_or_patrol = Selector('추적 또는 순찰', chase_boy, patrol)
+
         self.bt = BehaviorTree(root)
         pass
